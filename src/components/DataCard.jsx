@@ -2,66 +2,69 @@
 import React from 'react';
 
 const DataCard = ({ title, data, keys }) => {
-  // Helper untuk format angka (Ribuan vs Persen)
+  
   const formatValue = (key, value) => {
     if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
       return '0';
     }
     
     const numVal = Number(value);
-
-    // Logika Persen
     if (key && key.toLowerCase().includes('capaian')) {
       return numVal.toFixed(2).replace('.', ',') + '%';
     } 
-    
-    // Logika Ribuan (Format Indonesia)
     return numVal.toLocaleString('id-ID');
   };
 
-  // Helper untuk menentukan warna progress bar
-  const getProgressColor = (key, value) => {
-    if (!key.toLowerCase().includes('capaian')) return 'bg-gray-200'; // Bukan persen, abu-abu
-    
-    const numVal = Number(value);
-    if (numVal >= 100) return 'bg-green-500'; // Hijau jika mencapai target
-    if (numVal >= 80) return 'bg-blue-500';   // Biru jika mendekati
-    return 'bg-yellow-500';                   // Kuning jika rendah
+  const getLabel = (key) => {
+    if (key.includes('rkap')) return 'Rkap';
+    if (key.includes('prognosa')) return 'Prognosa';
+    if (key.includes('realisasi_2024')) return 'Real. 24';
+    if (key.includes('realisasi')) return 'Realisasi';
+    if (key.includes('capaian')) return '% Capaian';
+    return key.replace(/_/g, ' ');
   };
 
-  const formatLabel = (key) => {
-    return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const getProgressColor = (value) => {
+    const numVal = Number(value);
+    if (numVal >= 100) return 'bg-emerald-500';
+    if (numVal >= 80) return 'bg-blue-500';
+    return 'bg-amber-500';
   };
 
   return (
-    <div className="h-full">
-      {/* Header Card */}
-      <div className="text-sm font-bold text-slate-700 mb-2 text-center border-b border-gray-200 pb-1">
-        {title}
+    <div className="h-full flex flex-col">
+      {/* Header Kecil Kartu */}
+      <div className="px-3 py-2 bg-slate-100 border-b border-gray-200 text-center">
+        <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+          {title}
+        </h4>
       </div>
 
-      {/* Grid Isi Card */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* List Item Vertikal ke Bawah (1 Row 1 Kebawah) */}
+      <div className="p-2 bg-gray-50 flex-1 flex flex-col gap-1.5">
         {keys.map((key) => {
           const val = data[key];
           const displayVal = formatValue(key, val);
           const isPercent = key.toLowerCase().includes('capaian');
-          const progressWidth = isPercent ? Math.min(Math.max(Number(val), 0), 100) : 0; // Clamp 0-100
+          const progressWidth = isPercent ? Math.min(Math.max(Number(val), 0), 100) : 0;
+          const barColor = isPercent ? getProgressColor(val) : 'bg-transparent';
 
           return (
-            <div key={key} className="bg-white border border-gray-200 rounded p-2 shadow-sm">
-              <div className="text-[10px] text-gray-500 truncate mb-1" title={formatLabel(key)}>
-                {formatLabel(key)}
-              </div>
-              <div className="text-sm font-semibold text-slate-800 mb-1">
-                {displayVal}
+            <div key={key} className="bg-white p-2 rounded border border-gray-200 shadow-sm flex flex-col justify-center">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase w-1/2">
+                  {getLabel(key)}
+                </span>
+                <span className="text-xs font-bold text-slate-800 text-right w-1/2">
+                  {displayVal}
+                </span>
               </div>
               
-              {/* Progress Bar Hanya untuk Persen */}
+              {/* Progress Bar */}
               {isPercent && (
-                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1 overflow-hidden">
+                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-0.5 overflow-hidden">
                   <div 
-                    className={`h-1.5 rounded-full transition-all duration-300 ${getProgressColor(key, val)}`}
+                    className={`h-full rounded-full ${barColor}`}
                     style={{ width: `${progressWidth}%` }}
                   ></div>
                 </div>

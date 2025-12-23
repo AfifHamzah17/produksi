@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SheetPresenter } from './SheetPresenter';
 import DataTable from '../../components/DataTable';
 import SkeletonLoader from '../../components/SkeletonLoader';
+import AnalyticsSection from '../../components/AnalyticsSection'; // Import Komponen Baru
 
 function DataViewPage() {
   const [data, setData] = useState(null);
@@ -10,10 +11,13 @@ function DataViewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
-
-  // --- NEW: Pagination is now based on Kebun (rows) ---
+  
+  // State untuk Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [kebunPerPage, setKebunPerPage] = useState(10); // Default to 10 rows
+  const [kebunPerPage, setKebunPerPage] = useState(10);
+
+  // State untuk Tab View (Table vs Analytics)
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'analytics'
 
   const loadingTimeoutRef = useRef(null);
 
@@ -27,22 +31,12 @@ function DataViewPage() {
       return acc;
     }, {});
     
-    // Tambahkan logging untuk memeriksa data yang dikelompokkan
-    console.log('Grouped data keys:', Object.keys(groups));
-    
-    // Periksa nilai sd_month_capaian_pbb_sd_today di setiap grup
-    Object.keys(groups).forEach(groupName => {
-      const firstItem = groups[groupName][0];
-      console.log(`Group ${groupName} - sd_month_capaian_pbb_sd_today:`, firstItem.sd_month_capaian_pbb_sd_today);
-    });
-    
     return Object.keys(groups).map(groupName => ({
       groupName,
       items: groups[groupName],
     }));
   };
 
-  // --- NEW: Helper function to get the paginated view ---
   const getPaginatedData = (groups, page, perPage) => {
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
@@ -50,18 +44,14 @@ function DataViewPage() {
     let currentIndex = 0;
 
     for (const group of groups) {
-      // If the current group is completely outside the page range, skip it
       if (currentIndex + group.items.length <= startIndex) {
         currentIndex += group.items.length;
         continue;
       }
 
-      // If the current group is completely within the page range, add it all
       if (currentIndex >= startIndex && currentIndex + group.items.length <= endIndex) {
         paginatedView.push({ group, items: group.items });
-      }
-      // If the current group is partially on the page, add the relevant slice
-      else {
+      } else {
         const sliceStartIndex = Math.max(0, startIndex - currentIndex);
         const sliceEndIndex = Math.min(group.items.length, endIndex - currentIndex);
         paginatedView.push({
@@ -72,7 +62,7 @@ function DataViewPage() {
 
       currentIndex += group.items.length;
       if (currentIndex >= endIndex) {
-        break; // We've filled the page, so we can stop
+        break; 
       }
     }
     return paginatedView;
@@ -86,13 +76,12 @@ function DataViewPage() {
         const sheetData = await presenter.loadData();
         clearTimeout(loadingTimeoutRef.current);
         
-        // Tambahkan logging untuk memeriksa data mentah
-        console.log('Raw sheet data sample:', sheetData.slice(0, 3));
-        
         setData(sheetData);
         setError(null);
         const transformed = transformDataForGrouping(sheetData);
         setGroupedData(transformed);
+        
+        // Buka semua group secara default saat load awal
         const allGroupNames = new Set(transformed.map(g => g.groupName));
         setExpandedGroups(allGroupNames);
       } catch (err) {
@@ -108,7 +97,6 @@ function DataViewPage() {
     return () => { clearTimeout(loadingTimeoutRef.current); };
   }, []);
 
-  // Reset to page 1 if page size or data changes
   useEffect(() => {
     setCurrentPage(1);
   }, [kebunPerPage, groupedData]);
@@ -125,7 +113,6 @@ function DataViewPage() {
     });
   };
 
-  // --- NEW: Pagination logic based on total rows ---
   const totalRows = groupedData.reduce((sum, group) => sum + group.items.length, 0);
   const totalPages = Math.ceil(totalRows / kebunPerPage);
   const paginatedViewData = getPaginatedData(groupedData, currentPage, kebunPerPage);
@@ -134,20 +121,54 @@ function DataViewPage() {
     <>
       {isLoading && <SkeletonLoader rows={10} cols={10} />}
       {error && <div className="text-center p-4 text-red-500 bg-red-100 border border-red-400 rounded">Error: {error}</div>}
+      
       {!isLoading && !error && (
-        <DataTable
-          // --- Pass the new paginated data structure ---
-          paginatedViewData={paginatedViewData}
-          expandedGroups={expandedGroups}
-          onToggleGroup={handleToggleGroup}
-          // --- Pass updated pagination props ---
-          currentPage={currentPage}
-          totalPages={totalPages}
-          setCurrentPage={setCurrentPage}
-          kebunPerPage={kebunPerPage}
-          setKebunPerPage={setKebunPerPage}
-          totalRows={totalRows}
-        />
+        <div className="space-y-6">
+          
+          {/* --- TAB CONTROLLER --- */}
+          <div className="flex justify-center mb-6">
+            <div className="bg-slate-100 p-1 rounded-lg inline-flex">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  viewMode === 'table' 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Data Tabel
+              </button>
+              <button
+                onClick={() => setViewMode('analytics')}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  viewMode === 'analytics' 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                📊 Analisa Data
+              </button>
+            </div>
+          </div>
+
+          {/* --- CONTENT AREA --- */}
+          {viewMode === 'analytics' ? (
+             <AnalyticsSection paginatedViewData={paginatedViewData} />
+          ) : (
+            <DataTable
+              paginatedViewData={paginatedViewData}
+              expandedGroups={expandedGroups}
+              onToggleGroup={handleToggleGroup}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+              kebunPerPage={kebunPerPage}
+              setKebunPerPage={setKebunPerPage}
+              totalRows={totalRows}
+            />
+          )}
+
+        </div>
       )}
     </>
   );
